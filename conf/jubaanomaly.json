@@ -1,0 +1,7 @@
+{
+    "method": "kmeans",
+	"parameter": {
+        "k" : "$$cluster",
+        "seed" : 0
+    }
+}
