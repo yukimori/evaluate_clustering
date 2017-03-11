@@ -6,6 +6,13 @@
 		"centers" : [[5,5], [-5,-5]],
 		"center_box" : [-10.0, 10.0],
 		"seed" : 1,
-		"cluster_stds" : [1.0, 2.0, 5.0, 8.0, 10.0]
+		"cluster_stds" : 1.0
+	},
+	"noisy_moon" : {
+		"n_samples_per_cluster" : 100,
+		"noise" : 1.0
+	},
+	"noisy_circle" : {
+		
 	}
 }
