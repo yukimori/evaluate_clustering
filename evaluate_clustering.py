@@ -29,8 +29,14 @@ class Blobs:
     def get_name(self):
         return "blobs"
 
-    def get_pattern_num(self):
+    def get_cluster_stds(self):
         return len(self.cluster_stds)
+
+    def set_num_sample(self, n_samples_per_cluster):
+        self.config['n_samples_per_cluster'] = n_samples_per_cluster
+
+    def set_num_cluster(self, num_cluster):
+        self.config['cluster'] = num_cluster
         
     def build(self):
         self.n_sample = self.config['n_samples_per_cluster'] * self.config['cluster']
@@ -55,19 +61,42 @@ def get_logger():
 
     return logging.getLogger()
 
-def evaluate_performance(conf):
+def evaluate_performance(methods, test_num):
+    """
+    性能評価を行う
+    blobsのクラスタ数とデータ数を変化させる
+    クラスタリングアルゴリズムの時間を測定する
+    表形式で表示する
+    """
+    conf = Config()
     perf_conf = (conf.get_sub_config('performance'))
     logger.debug(perf_conf)
     
-    fig_dir = conf.get_config('fig', 'performance')
+    FIG_DIR = conf.get_config('fig', 'performance')
+    DATA_DIR = conf.get_config('data', 'performance')
 
-    
-    
-    
+    # データセットを作成する
+    dataset_conf = conf.get_sub_config('dataset')
+    blobs = Blobs(dataset_conf['blobs'])
+
+    # パラメータ
+    # TODO:yuhara 効率のよいパラメータ設定方法．外部設定化がよい？
+    n_cluster_list = [2, 5, 10, 20, 50]
+    n_samples_per_cluster_list = [100, 500, 1000]
+
+    # 色の設定
+    colors = util.get_colors()
+
+    # 測定の実施
+    for n_cluster in n_cluster_list:
+        for n_samples_per_cluster in n_samples_per_cluster_list:
+            
+            for client_num, (client_name, client) in enumerate(methods.items()):
+                for i in test_num:
+                    
 
     
 def evaluate_accuracy(methods, datasets, conf):
-
     picture_dir = conf.get_config('fig', 'accuracy')
 
     # 色の設定

@@ -2,7 +2,7 @@
 	"blobs" : {
 		"n_samples_per_cluster" : 100,
 		"n_features" : 2,
-		"cluster" : "$$cluster",
+		"cluster" : 2,
 		"centers" : [[5,5], [-5,-5]],
 		"center_box" : [-10.0, 10.0],
 		"seed" : 1,
