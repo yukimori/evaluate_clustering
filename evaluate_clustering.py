@@ -5,8 +5,12 @@ import matplotlib.pyplot as plt
 from sklearn import datasets
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import kneighbors_graph
+from collections import defaultdict
 import numpy as np
 import json
+import time
+import os
+
 
 from embedded_jubatus import Clustering
 from jubatus.clustering.types import WeightedDatum
@@ -32,27 +36,30 @@ class Blobs:
     def get_cluster_stds(self):
         return len(self.cluster_stds)
 
-    def set_num_sample(self, n_samples_per_cluster):
-        self.config['n_samples_per_cluster'] = n_samples_per_cluster
-
-    def set_num_cluster(self, num_cluster):
-        self.config['cluster'] = num_cluster
-        
-    def build(self):
-        self.n_sample = self.config['n_samples_per_cluster'] * self.config['cluster']
-        self.cluster_stds = self.config['cluster_stds']
+    def set_samples_per_cluster_list(self, n_samples_per_cluster_list):
+        self.config['n_samples_per_cluster'] = n_samples_per_cluster_list
         return self
 
-    def generate_datasets(self):
-        i = 0
-        for std in self.cluster_stds:
-            self.dataset = datasets.make_blobs(
-                n_samples = self.n_sample,
-                cluster_std = std,
-                centers = self.config['centers'])
-            i += 1
-            yield i,self.dataset
+    def set_num_cluster_list(self, num_cluster_list):
+        self.config['cluster'] = num_cluster_list
+        return self
 
+    def set_num_cluster_stds_list(self, num_cluster_stds_list):
+        self.config['cluster_stds'] = num_cluster_stds_list
+        return self
+
+    def generate(self):
+        i = 1
+        for num_sample in self.config['n_samples_per_cluster']:
+            for num_cluster in self.config['cluster']:
+                total_num_sample = num_sample * num_cluster
+                for cluster_std in self.config['cluster_stds']:
+                    self.dataset = datasets.make_blobs(
+                        n_samples = total_num_sample,
+                        cluster_std = cluster_std,
+                        centers = num_cluster)
+                    yield (i,num_cluster,num_sample,cluster_std,self.dataset)
+                    i += 1
             
 def get_logger():
     conf = Config()
@@ -61,7 +68,8 @@ def get_logger():
 
     return logging.getLogger()
 
-def evaluate_performance(methods, test_num):
+
+def evaluate_clustering_performance(test_num):
     """
     性能評価を行う
     blobsのクラスタ数とデータ数を変化させる
@@ -82,18 +90,68 @@ def evaluate_performance(methods, test_num):
     # パラメータ
     # TODO:yuhara 効率のよいパラメータ設定方法．外部設定化がよい？
     n_cluster_list = [2, 5, 10, 20, 50]
+    # n_cluster_list = [2, 5, 10]
     n_samples_per_cluster_list = [100, 500, 1000]
+    # n_samples_per_cluster_list = [10, 100]
+
+    # データセットにパラメータを設定する
+    blobs.set_num_cluster_list(n_cluster_list)
+    blobs.set_samples_per_cluster_list(n_samples_per_cluster_list)
+    blobs.set_num_cluster_stds_list([1.0])
 
     # 色の設定
     colors = util.get_colors()
 
     # 測定の実施
-    for n_cluster in n_cluster_list:
-        for n_samples_per_cluster in n_samples_per_cluster_list:
-            
-            for client_num, (client_name, client) in enumerate(methods.items()):
-                for i in test_num:
-                    
+    methods = ['kmeans', 'gmm', 'dbscan']
+    # methods = ['kmeans']
+    result = defaultdict(util._factory)
+    for data_i, num_cluster, num_sample, cluster_std, (X, y) in blobs.generate():
+        print("{0} / {1} start.".format(data_i, len(n_cluster_list)*len(n_samples_per_cluster_list)))
+        logger.debug("{0} {1} {2} {3}".format(data_i, num_cluster, num_sample, cluster_std))
+        for method in methods:
+            logger.debug("method {0}".format(method))
+            method_conf = dict()
+            if method in 'kmeans':
+                method_conf = conf.get_sub_config('jubatus/kmeans')
+                method_conf['parameter']['k'] = num_cluster
+            elif method in 'gmm':
+                method_conf = conf.get_sub_config('jubatus/gmm')
+                method_conf['parameter']['k'] = num_cluster
+            elif method in 'dbscan':
+                method_conf = conf.get_sub_config('jubatus/dbscan')
+            # クラスタリング1回のみ行うように調整
+            method_conf['compressor_parameter']['bucket_size'] = num_sample * num_cluster
+
+            logger.debug("{0}".format(method_conf))
+            clustering_client = Clustering(method_conf)
+            duration = 0
+            for test_i in range(test_num):
+                point_i = 0
+                clustering_client.clear()
+                indexed_points = []
+                for row in X:
+                    indexed_points.append(IndexedPoint(str(point_i), Datum({'x' : row[0], 'y' : row[1]})))
+                    point_i += 1
+                start_time = time.time()
+                clustering_client.push(indexed_points)
+                end_time = time.time()
+                duration += (end_time - start_time)
+                logger.debug("duration {0}".format((end_time - start_time)))
+                logger.debug("revision {0}".format(clustering_client.get_revision()))
+            average_duration = duration / test_num
+            logger.info("average {0}".format(average_duration))
+            result[method][num_cluster][num_sample] = average_duration
+        print("  {0} end".format(data_i))
+
+    DATA_DIR = conf.get_config('data', 'performance')
+    with open(os.path.join(DATA_DIR, "perfomance.csv"), 'a') as f:
+        for method in methods:
+            for n_cluster in n_cluster_list:
+                for n_sample in n_samples_per_cluster_list:
+                    f.write("{0},{1},{2},{3}\n".format(method, n_cluster, n_sample, result[method][n_cluster][n_sample]))
+        f.write("\n")
+    return result
 
     
 def evaluate_accuracy(methods, datasets, conf):
@@ -143,13 +201,13 @@ def main():
     methods = dict()
     
     # logger.debug('generate dataset')
-    dataset_conf = conf.get_sub_config('dataset')
+    # dataset_conf = conf.get_sub_config('dataset')
     # dataset_config = json.load(conf.get_config('conf', 'dataset'))
-    print(dataset_conf)
-    blobs = Blobs(dataset_conf['blobs'])
-    blobs.build()
+    # print(dataset_conf)
+    # blobs = Blobs(dataset_conf['blobs'])
+    # blobs.build()
 
-    datasets["blobs"] = blobs
+    # datasets["blobs"] = blobs
 
     # jubaclusteringの起動
     kmeans_conf = conf.get_sub_config('jubatus/kmeans')
@@ -163,7 +221,9 @@ def main():
     methods["dbscan"] = dbscan
 
 #    evaluate_accuracy(methods, datasets, conf)
-    evaluate_performance(conf)
+    result = evaluate_clustering_performance(5)
+    print("{0}".format(json.dumps(result, indent=4)))
+    logger.info("{0}".format(json.dumps(result, indent=4)))
 
 if __name__ == '__main__':
     # loggerの起動 グローバルにアクセスできるようにここで定義

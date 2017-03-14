@@ -1,6 +1,9 @@
 # -*- coding:utf-8 -*-
 
 import numpy as np
+from collections import defaultdict
+from datetime import datetime
+from string import Template
 
 def get_colors():
     # 色の設定
@@ -8,8 +11,8 @@ def get_colors():
     colors = np.hstack([colors] * 20)
     return colors
 
-from datetime import datetime
-from string import Template
+def _factory():
+    return defaultdict(_factory)
 
 class DeltaTemplate(Template):
     delimiter = "%"

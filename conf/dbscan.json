@@ -1,0 +1,26 @@
+{
+    "method": "dbscan",
+    "parameter": {
+		"min_core_point" : 2,
+        "eps" : 0.5
+    },
+    "compressor_parameter": {
+        "bucket_size": 2
+    },
+    "compressor_method" : "simple",
+    "converter": {
+        "num_filter_types": {},
+        "num_filter_rules": [],
+        "string_filter_types": {},
+        "string_filter_rules": [],
+        "num_types": {},
+        "num_rules": [
+            {"key": "*", "type": "num"}
+        ],
+        "string_types": {},
+        "string_rules": [
+            {"key": "*", "type": "space",
+             "sample_weight": "bin", "global_weight": "bin"}
+        ]
+    }
+}
