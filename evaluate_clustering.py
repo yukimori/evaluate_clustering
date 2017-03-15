@@ -49,15 +49,18 @@ class Blobs:
         return self
 
     def generate(self):
+        step = 10
         i = 1
         for num_sample in self.config['n_samples_per_cluster']:
             for num_cluster in self.config['cluster']:
                 total_num_sample = num_sample * num_cluster
+                centers = [(x,x) for x in range(0, step*num_cluster, step)]
                 for cluster_std in self.config['cluster_stds']:
+                    print(centers)
                     self.dataset = datasets.make_blobs(
                         n_samples = total_num_sample,
                         cluster_std = cluster_std,
-                        centers = num_cluster)
+                        centers = centers)
                     yield (i,num_cluster,num_sample,cluster_std,self.dataset)
                     i += 1
             
@@ -91,7 +94,7 @@ def evaluate_clustering_performance(test_num):
     # TODO:yuhara 効率のよいパラメータ設定方法．外部設定化がよい？
     n_cluster_list = [2, 5, 10, 20, 50]
     # n_cluster_list = [2, 5, 10]
-    n_samples_per_cluster_list = [100, 500, 1000]
+    n_samples_per_cluster_list = [10, 100, 500]
     # n_samples_per_cluster_list = [10, 100]
 
     # データセットにパラメータを設定する
@@ -101,6 +104,8 @@ def evaluate_clustering_performance(test_num):
 
     # 色の設定
     colors = util.get_colors()
+    # データの保存場所の設定
+    DATA_DIR = conf.get_config('data', 'performance')
 
     # 測定の実施
     methods = ['kmeans', 'gmm', 'dbscan']
@@ -142,9 +147,13 @@ def evaluate_clustering_performance(test_num):
             average_duration = duration / test_num
             logger.info("average {0}".format(average_duration))
             result[method][num_cluster][num_sample] = average_duration
+
+            with open(os.path.join(DATA_DIR, "perfomance.csv"), 'a') as f:
+                f.write("{0},{1},{2},{3}\n".format(method, num_cluster, num_sample, average_duration))
+
         print("  {0} end".format(data_i))
 
-    DATA_DIR = conf.get_config('data', 'performance')
+
     with open(os.path.join(DATA_DIR, "perfomance.csv"), 'a') as f:
         for method in methods:
             for n_cluster in n_cluster_list:
