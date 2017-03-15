@@ -2,9 +2,12 @@
 
 from __future__ import print_function
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sklearn import datasets
+from sklearn.mixture import GaussianMixture as GMM
+from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import kneighbors_graph
 from collections import defaultdict
@@ -73,14 +76,38 @@ def get_logger():
 
     return logging.getLogger()
 
+class sklearn_client():
+    def __init__(self, method_conf):
+        if method_conf['method'] in 'kmeans':
+            self.client = KMeans(n_clusters = method_conf['parameter']['k'])
+        elif method_conf['method'] in 'gmm':
+            self.client = GMM(n_components = method_conf['parameter']['k'])
+        elif method_conf['method'] in 'dbscan':
+            self.client = DBSCAN(eps = method_conf['parameter']['eps'], min_samples = method_conf['parameter']['min_core_point'])
+        self.method_conf = method_conf
+        self.revision = 0
 
-def evaluate_clustering_performance(test_num):
+    def push(self, data):
+        self.client.fit(data)
+        self.revision = 1
+        if self.method_conf['method'] in 'gmm':
+            return self.client.predict(data)
+        return self.client
+
+    def clear(self):
+        pass
+
+    def get_revision(self):
+        return self.revision
+        
+def evaluate_clustering_performance(test_num, is_sklearn=False):
     """
     性能評価を行う
     blobsのクラスタ数とデータ数を変化させる
     クラスタリングアルゴリズムの時間を測定する
     表形式で表示する
     """
+    logger.info("===== is_sklearn {0} ======".format(is_sklearn))
     conf = Config()
     perf_conf = (conf.get_sub_config('performance'))
     logger.debug(perf_conf)
@@ -129,17 +156,21 @@ def evaluate_clustering_performance(test_num):
                 method_conf = conf.get_sub_config('jubatus/dbscan')
             # クラスタリング1回のみ行うように調整
             method_conf['compressor_parameter']['bucket_size'] = num_sample * num_cluster
-
             logger.debug("{0}".format(method_conf))
             clustering_client = Clustering(method_conf)
+            if is_sklearn:
+                clustering_client = sklearn_client(method_conf)
             duration = 0
             for test_i in range(test_num):
                 point_i = 0
                 clustering_client.clear()
                 indexed_points = []
-                for row in X:
-                    indexed_points.append(IndexedPoint(str(point_i), Datum({'x' : row[0], 'y' : row[1]})))
-                    point_i += 1
+                if is_sklearn:
+                    indexed_points = X
+                else:
+                    for row in X:
+                        indexed_points.append(IndexedPoint(str(point_i), Datum({'x' : row[0], 'y' : row[1]})))
+                        point_i += 1
                 start_time = time.time()
                 clustering_client.push(indexed_points)
                 end_time = time.time()
@@ -232,7 +263,7 @@ def main():
     methods["dbscan"] = dbscan
 
 #    evaluate_accuracy(methods, datasets, conf)
-    result = evaluate_clustering_performance(5)
+    result = evaluate_clustering_performance(5, True)
     print("{0}".format(json.dumps(result, indent=4)))
     logger.info("{0}".format(json.dumps(result, indent=4)))
 
