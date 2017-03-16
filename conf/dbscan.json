@@ -2,7 +2,7 @@
     "method": "dbscan",
     "parameter": {
 		"min_core_point" : 2,
-        "eps" : 0.5
+        "eps" : 2.0
     },
     "compressor_parameter": {
         "bucket_size": 2

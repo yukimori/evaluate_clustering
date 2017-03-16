@@ -91,6 +91,7 @@ class sklearn_client():
         self.client.fit(data)
         self.revision = 1
         if self.method_conf['method'] in 'gmm':
+            # gmmの場合はpredictを適用してラベルのみを返却する
             return self.client.predict(data)
         return self.client
 
@@ -121,10 +122,10 @@ def evaluate_clustering_performance(test_num, is_sklearn=False):
 
     # パラメータ
     # TODO:yuhara 効率のよいパラメータ設定方法．外部設定化がよい？
-    n_cluster_list = [2, 5, 10, 20, 50]
-    # n_cluster_list = [2, 5, 10]
-    n_samples_per_cluster_list = [10, 100, 500]
-    # n_samples_per_cluster_list = [10, 100]
+    # n_cluster_list = [2, 5, 10, 20, 50]
+    n_cluster_list = [3]
+    # n_samples_per_cluster_list = [10, 100, 500]
+    n_samples_per_cluster_list = [10]
 
     # データセットにパラメータを設定する
     blobs.set_num_cluster_list(n_cluster_list)
@@ -137,8 +138,8 @@ def evaluate_clustering_performance(test_num, is_sklearn=False):
     DATA_DIR = conf.get_config('data', 'performance')
 
     # 測定の実施
-    methods = ['kmeans', 'gmm', 'dbscan']
-    # methods = ['kmeans']
+    # methods = ['kmeans', 'gmm', 'dbscan']
+    methods = ['gmm']
     result = defaultdict(util._factory)
     for data_i, num_cluster, num_sample, cluster_std, (X, y) in blobs.generate():
         print("{0} / {1} start.".format(data_i, len(n_cluster_list)*len(n_samples_per_cluster_list)))
@@ -172,7 +173,7 @@ def evaluate_clustering_performance(test_num, is_sklearn=False):
                         indexed_points.append(IndexedPoint(str(point_i), Datum({'x' : row[0], 'y' : row[1]})))
                         point_i += 1
                 start_time = time.time()
-                clustering_client.push(indexed_points)
+                model = clustering_client.push(indexed_points)
                 end_time = time.time()
                 duration += (end_time - start_time)
                 logger.debug("duration {0}".format((end_time - start_time)))
